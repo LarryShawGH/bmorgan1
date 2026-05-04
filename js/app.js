@@ -1,0 +1,301 @@
+/**
+ * TorS demo: synthetic intraday series + level drawing (browser preview only).
+ * Times are modeled in ET minutes from midnight for labeling.
+ */
+
+const RTH_START = 9 * 60 + 30; // 9:30
+const RTH_END = 16 * 60; // 16:00
+const BAR_MINUTES = 1;
+const BARS_PER_DAY = (RTH_END - RTH_START) / BAR_MINUTES;
+
+/** Fallbacks keyed by HTML id (see getConfig). */
+const defaults = {
+  cPdHigh: "#ef4444",
+  cPdLow: "#22c55e",
+  cOnHigh: "#86efac",
+  cOnLow: "#fca5a5",
+  cOrHigh: "#4ade80",
+  cOrLow: "#f87171",
+  cBoxFill: "#6366f1",
+  cCenter: "#f8fafc",
+  cHalfHour: "#e2e8f0",
+  sPdHigh: true,
+  sPdLow: true,
+  sOnHigh: true,
+  sOnLow: true,
+  sOrHigh: true,
+  sOrLow: true,
+  sBox: true,
+  sHalfHour: true,
+  orMinutes: 30,
+  boxOpacity: 0.12,
+};
+
+function hexToRgba(hex, alpha) {
+  const h = (hex || "").replace("#", "");
+  if (h.length !== 6) return `rgba(99, 102, 241, ${alpha})`;
+  const n = parseInt(h, 16);
+  if (!Number.isFinite(n)) return `rgba(99, 102, 241, ${alpha})`;
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+function applyQueryToForm() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.has("or")) {
+    const v = Math.min(120, Math.max(5, Number(p.get("or")) || 30));
+    const el = document.getElementById("orMinutes");
+    if (el) el.value = String(v);
+  }
+  if (p.has("seed")) {
+    const v = Number(p.get("seed"));
+    const el = document.getElementById("seed");
+    if (el && Number.isFinite(v)) el.value = String(v >>> 0);
+  }
+}
+
+function mulberry32(a) {
+  return function () {
+    let t = (a += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function generateSession(seed) {
+  const rnd = mulberry32(seed >>> 0);
+  const base = 100 + rnd() * 20;
+
+  const pdHigh = base + 0.4 + rnd() * 0.5;
+  const pdLow = base - 0.6 - rnd() * 0.5;
+  const onHigh = pdHigh - 0.05 + rnd() * 0.3;
+  const onLow = pdLow + 0.05 - rnd() * 0.3;
+
+  const bars = [];
+  let price = base + (rnd() - 0.5) * 0.3;
+  for (let i = 0; i < BARS_PER_DAY; i++) {
+    const drift = (rnd() - 0.48) * 0.08;
+    const o = price;
+    const c = o + drift + (rnd() - 0.5) * 0.12;
+    const h = Math.max(o, c) + rnd() * 0.06;
+    const l = Math.min(o, c) - rnd() * 0.06;
+    bars.push({ o, h, l, c });
+    price = c;
+  }
+
+  const orMinutes = Math.max(
+    5,
+    Math.min(120, parseInt(document.getElementById("orMinutes")?.value || "30", 10) || 30)
+  );
+  const orBars = Math.round(orMinutes / BAR_MINUTES);
+  let orH = -Infinity;
+  let orL = Infinity;
+  for (let i = 0; i < Math.min(orBars, bars.length); i++) {
+    orH = Math.max(orH, bars[i].h);
+    orL = Math.min(orL, bars[i].l);
+  }
+
+  return { bars, levels: { pdHigh, pdLow, onHigh, onLow, orHigh: orH, orLow: orL }, base };
+}
+
+function etMinuteToLabel(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const am = h < 12;
+  const hh = h % 12 || 12;
+  const mm = m.toString().padStart(2, "0");
+  return `${hh}:${mm} ${am ? "AM" : "PM"}`;
+}
+
+function getConfig() {
+  const g = (id) => document.getElementById(id);
+  const c = (id) => g(id)?.value || defaults[id];
+  const chk = (id) => g(id)?.checked ?? defaults[id];
+  return {
+    pdHigh: c("cPdHigh"),
+    pdLow: c("cPdLow"),
+    onHigh: c("cOnHigh"),
+    onLow: c("cOnLow"),
+    orHigh: c("cOrHigh"),
+    orLow: c("cOrLow"),
+    boxFill: c("cBoxFill"),
+    centerLine: c("cCenter"),
+    halfHour: c("cHalfHour"),
+    showPdH: chk("sPdHigh"),
+    showPdL: chk("sPdLow"),
+    showOnH: chk("sOnHigh"),
+    showOnL: chk("sOnLow"),
+    showOrH: chk("sOrHigh"),
+    showOrL: chk("sOrLow"),
+    showBox: chk("sBox"),
+    showHalfHour: chk("sHalfHour"),
+    boxOpacity: parseFloat(g("boxOpacity")?.value || String(defaults.boxOpacity)),
+  };
+}
+
+function draw() {
+  const canvas = document.getElementById("chart");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.floor(rect.width * dpr);
+  canvas.height = Math.floor(rect.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const W = rect.width;
+  const H = rect.height;
+  const pad = { l: 56, r: 12, t: 28, b: 36 };
+  const plotW = W - pad.l - pad.r;
+  const plotH = H - pad.t - pad.b;
+
+  const seed = parseInt(document.getElementById("seed")?.value || "42", 10) || 42;
+  const { bars, levels } = generateSession(seed);
+  const cfg = getConfig();
+
+  let ymin = Infinity;
+  let ymax = -Infinity;
+  for (const b of bars) {
+    ymin = Math.min(ymin, b.l);
+    ymax = Math.max(ymax, b.h);
+  }
+  for (const v of Object.values(levels)) {
+    ymin = Math.min(ymin, v);
+    ymax = Math.max(ymax, v);
+  }
+  const padY = (ymax - ymin) * 0.08 || 0.1;
+  ymin -= padY;
+  ymax += padY;
+
+  const yScale = (p) => pad.t + plotH - ((p - ymin) / (ymax - ymin)) * plotH;
+  const xScale = (i) => pad.l + (i / (bars.length - 1 || 1)) * plotW;
+
+  ctx.fillStyle = "#010409";
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = "#21262d";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.t + (plotH * i) / 5;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(pad.l + plotW, y);
+    ctx.stroke();
+    const price = ymax - (i / 5) * (ymax - ymin);
+    ctx.fillStyle = "#6e7681";
+    ctx.font = "11px " + getComputedStyle(document.body).fontFamily;
+    ctx.textAlign = "right";
+    ctx.fillText(price.toFixed(2), pad.l - 8, y + 4);
+  }
+
+  ctx.fillStyle = "#8b949e";
+  ctx.font = "12px " + getComputedStyle(document.body).fontFamily;
+  ctx.textAlign = "center";
+  ctx.fillText("Eastern Time (concept demo)", W / 2, 18);
+
+  function hLine(price, color, dash) {
+    const y = yScale(price);
+    ctx.beginPath();
+    if (dash) ctx.setLineDash(dash);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(pad.l + plotW, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  if (cfg.showBox) {
+    const y1 = yScale(levels.pdHigh);
+    const y2 = yScale(levels.pdLow);
+    const top = Math.min(y1, y2);
+    const h = Math.abs(y2 - y1);
+    ctx.fillStyle = hexToRgba(cfg.boxFill, cfg.boxOpacity);
+    ctx.fillRect(pad.l, top, plotW, h);
+    const mid = (levels.pdHigh + levels.pdLow) / 2;
+    hLine(mid, cfg.centerLine, [4, 4]);
+    ctx.fillStyle = cfg.centerLine;
+    ctx.font = "10px " + getComputedStyle(document.body).fontFamily;
+    ctx.textAlign = "left";
+    ctx.fillText(mid.toFixed(2), pad.l + plotW - 48, yScale(mid) - 4);
+  }
+
+  if (cfg.showPdH) hLine(levels.pdHigh, cfg.pdHigh);
+  if (cfg.showPdL) hLine(levels.pdLow, cfg.pdLow);
+  if (cfg.showOnH) hLine(levels.onHigh, cfg.onHigh, [6, 4]);
+  if (cfg.showOnL) hLine(levels.onLow, cfg.onLow, [6, 4]);
+  if (cfg.showOrH) hLine(levels.orHigh, cfg.orHigh);
+  if (cfg.showOrL) hLine(levels.orLow, cfg.orLow);
+
+  const halfHourStarts = [];
+  for (let m = RTH_START; m <= RTH_END; m += 30) {
+    halfHourStarts.push(m);
+  }
+
+  if (cfg.showHalfHour) {
+    ctx.font = "9px " + getComputedStyle(document.body).fontFamily;
+    halfHourStarts.forEach((etMin, idx) => {
+      const barIdx = Math.round(((etMin - RTH_START) / BAR_MINUTES) * (bars.length / BARS_PER_DAY));
+      const i = Math.min(bars.length - 1, Math.max(0, barIdx));
+      const x = xScale(i);
+      const close = bars[i].c;
+      ctx.beginPath();
+      ctx.strokeStyle = cfg.halfHour;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.moveTo(x, pad.t);
+      ctx.lineTo(x, pad.t + plotH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = cfg.halfHour;
+      ctx.textAlign = "center";
+      ctx.fillText(etMinuteToLabel(etMin), x, pad.t + plotH + 14);
+      ctx.textAlign = "left";
+      ctx.fillText(close.toFixed(2), x + 3, pad.t + 12 + (idx % 3) * 11);
+    });
+  }
+
+  const candleW = Math.max(1, plotW / bars.length * 0.6);
+  bars.forEach((b, i) => {
+    const x = xScale(i);
+    const yO = yScale(b.o);
+    const yC = yScale(b.c);
+    const yH = yScale(b.h);
+    const yL = yScale(b.l);
+    const up = b.c >= b.o;
+    ctx.strokeStyle = up ? "#3fb950" : "#f85149";
+    ctx.fillStyle = up ? "#3fb950" : "#f85149";
+    ctx.beginPath();
+    ctx.moveTo(x, yH);
+    ctx.lineTo(x, yL);
+    ctx.stroke();
+    const top = Math.min(yO, yC);
+    const h = Math.max(1, Math.abs(yC - yO));
+    ctx.fillRect(x - candleW / 2, top, candleW, h);
+  });
+
+}
+
+function wire() {
+  document.querySelectorAll("[data-refresh]").forEach((el) => {
+    el.addEventListener("input", draw);
+    el.addEventListener("change", draw);
+  });
+  document.getElementById("btnRegen")?.addEventListener("click", () => {
+    const s = document.getElementById("seed");
+    if (s) s.value = String((Math.random() * 1e9) | 0);
+    draw();
+  });
+  document.getElementById("btnRedraw")?.addEventListener("click", draw);
+  let resizeT;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeT);
+    resizeT = setTimeout(draw, 120);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  applyQueryToForm();
+  wire();
+  draw();
+});

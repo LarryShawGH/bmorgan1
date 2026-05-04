@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TorS — ThinkorSwim Intraday Levels (spec &amp; demo)</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>ThinkorSwim intraday levels — specification preview</h1>
+      <p>
+        Foundation page for client review. The live indicator will be
+        <strong>ThinkScript</strong> inside ThinkorSwim; this site explains requirements and
+        shows a <em>browser-only</em> mock chart.
+      </p>
+    </header>
+
+    <main>
+      <section>
+        <h2>Interactive demo (not ThinkorSwim)</h2>
+        <p class="lead">
+          Synthetic 1-minute RTH session (9:30–4:00 ET) with placeholder math for previous day,
+          overnight, and opening range levels. Use the panel to mirror planned study inputs.
+        </p>
+        <div class="grid-two">
+          <div class="panel">
+            <h3>Execution inputs (web demo)</h3>
+            <div class="field field-row">
+              <label for="seed">Scenario seed</label>
+              <input type="number" id="seed" data-refresh value="42" />
+            </div>
+            <div class="field field-row">
+              <label for="orMinutes">Opening range (min)</label>
+              <input type="number" id="orMinutes" data-refresh min="5" max="120" value="30" />
+            </div>
+            <div class="field field-row">
+              <label for="boxOpacity">PD box opacity</label>
+              <input
+                type="range"
+                id="boxOpacity"
+                data-refresh
+                min="0.05"
+                max="0.35"
+                step="0.01"
+                value="0.12"
+              />
+            </div>
+            <button type="button" class="primary" id="btnRegen">New random seed</button>
+            <button type="button" id="btnRedraw" style="margin-top: 0.5rem; width: 100%">
+              Redraw
+            </button>
+
+            <h3 style="margin-top: 1rem">Visibility</h3>
+            <div class="field">
+              <label><input type="checkbox" id="sPdHigh" data-refresh checked /> Previous day high</label>
+            </div>
+            <div class="field">
+              <label><input type="checkbox" id="sPdLow" data-refresh checked /> Previous day low</label>
+            </div>
+            <div class="field">
+              <label><input type="checkbox" id="sOnHigh" data-refresh checked /> Overnight high</label>
+            </div>
+            <div class="field">
+              <label><input type="checkbox" id="sOnLow" data-refresh checked /> Overnight low</label>
+            </div>
+            <div class="field">
+              <label><input type="checkbox" id="sOrHigh" data-refresh checked /> Opening range high</label>
+            </div>
+            <div class="field">
+              <label><input type="checkbox" id="sOrLow" data-refresh checked /> Opening range low</label>
+            </div>
+            <div class="field">
+              <label><input type="checkbox" id="sBox" data-refresh checked /> PD high/low box + midline</label>
+            </div>
+            <div class="field">
+              <label><input type="checkbox" id="sHalfHour" data-refresh checked /> Half-hour lines</label>
+            </div>
+
+            <h3 style="margin-top: 1rem">Colors</h3>
+            <div class="field field-row">
+              <label for="cPdHigh">PD high</label>
+              <input type="color" id="cPdHigh" data-refresh value="#ef4444" />
+            </div>
+            <div class="field field-row">
+              <label for="cPdLow">PD low</label>
+              <input type="color" id="cPdLow" data-refresh value="#22c55e" />
+            </div>
+            <div class="field field-row">
+              <label for="cOnHigh">ON high</label>
+              <input type="color" id="cOnHigh" data-refresh value="#86efac" />
+            </div>
+            <div class="field field-row">
+              <label for="cOnLow">ON low</label>
+              <input type="color" id="cOnLow" data-refresh value="#fca5a5" />
+            </div>
+            <div class="field field-row">
+              <label for="cOrHigh">OR high</label>
+              <input type="color" id="cOrHigh" data-refresh value="#4ade80" />
+            </div>
+            <div class="field field-row">
+              <label for="cOrLow">OR low</label>
+              <input type="color" id="cOrLow" data-refresh value="#f87171" />
+            </div>
+            <div class="field field-row">
+              <label for="cBoxFill">Box tint</label>
+              <input type="color" id="cBoxFill" data-refresh value="#6366f1" />
+            </div>
+            <div class="field field-row">
+              <label for="cCenter">Midline</label>
+              <input type="color" id="cCenter" data-refresh value="#f8fafc" />
+            </div>
+            <div class="field field-row">
+              <label for="cHalfHour">Half-hour</label>
+              <input type="color" id="cHalfHour" data-refresh value="#e2e8f0" />
+            </div>
+          </div>
+
+          <div>
+            <div class="chart-wrap">
+              <canvas id="chart" width="900" height="520" aria-label="Demo chart"></canvas>
+            </div>
+            <div class="legend">
+              <span><i style="background: #ef4444"></i> PDH</span>
+              <span><i style="background: #22c55e"></i> PDL</span>
+              <span><i style="background: #86efac"></i> ONH</span>
+              <span><i style="background: #fca5a5"></i> ONL</span>
+              <span><i style="background: #4ade80"></i> ORH</span>
+              <span><i style="background: #f87171"></i> ORL</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Requirements summary</h2>
+        <p class="lead">
+          <span class="tag">ET only</span>
+          RTH 9:30–4:00; overnight 4:00 PM prior → 9:30 AM current; opening range default 9:30–10:00.
+        </p>
+        <table class="req">
+          <thead>
+            <tr>
+              <th>Element</th>
+              <th>Spec color</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Previous day high / low</td>
+              <td>Red / Green</td>
+            </tr>
+            <tr>
+              <td>Overnight high / low</td>
+              <td>Light green / Light red</td>
+            </tr>
+            <tr>
+              <td>Opening range high / low</td>
+              <td>Distinct green / Distinct red</td>
+            </tr>
+            <tr>
+              <td>PD range box center line</td>
+              <td>White + midpoint price label</td>
+            </tr>
+            <tr>
+              <td>Half-hour verticals (9:30–4:00)</td>
+              <td>White + time + price at line</td>
+            </tr>
+          </tbody>
+        </table>
+        <ul class="compact" style="margin-top: 1rem">
+          <li>Alerts on cross of any of the six levels (native TOS alerts).</li>
+          <li>ThinkScript deliverable: one <code>.ts</code> study + import steps.</li>
+          <li>Compatible with OnDemand / strategy-style backtest where applicable.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>GitHub Pages</h2>
+        <p class="lead">
+          Push this folder as a repository, then enable Pages (branch <code>main</code>, folder
+          <code>/ (root)</code>). Share the <code>https://&lt;user&gt;.github.io/&lt;repo&gt;/</code> URL.
+          Optional query: <code>?or=45</code> sets opening range minutes on load.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      TorS requirements preview — mock data only; not financial advice.
+    </footer>
+
+    <script src="js/app.js"></script>
+  </body>
+</html>

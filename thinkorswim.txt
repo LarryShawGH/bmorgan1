@@ -1,0 +1,76 @@
+Automated Trading Program Outline for Think or Swim
+
+1. Program Initialization
+   - Set Time Frame: Establish working hours from 9:30 AM to 4:00 PM ET.
+   - Define Variables:
+     - openingRangeHigh
+     - openingRangeLow
+     - previousDayHigh
+     - previousDayLow
+     - overnightHigh
+     - overnightLow
+     - halfHourLines (for 30-minute intervals)
+
+2. Calculate Previous Day's High and Low
+   - Retrieve Previous Day's Data:
+     - Calculate previousDayHigh and previousDayLow from the previous trading day.
+   - Color Code:
+     - Set previousDayHigh to Red.
+     - Set previousDayLow to Green.
+
+3. Calculate Overnight High and Low
+   - Retrieve Overnight Data (from 4 PM to 9:30 AM):
+     - Calculate overnightHigh and overnightLow.
+   - Color Code:
+     - Set overnightHigh to a lighter shade of Green.
+     - Set overnightLow to a lighter shade of Red.
+
+4. Setup 30-Minute Opening Range
+   - Calculate the Opening Range:
+     - Determine the high (openingRangeHigh) and low (openingRangeLow) from the first 30 minutes of trading (9:30 AM to 10:00 AM).
+   - Color Code:
+     - Set openingRangeHigh to a distinct shade of Green.
+     - Set openingRangeLow to a distinct shade of Red.
+
+5. Draw Box for Previous Day's High and Low
+   - Create Box: Draw a box that spans from previousDayLow to previousDayHigh.
+   - Dividing Line: Add a dividing line in the center of the box.
+     - Color: White
+     - Label: Indicate the dollar amount at the center.
+
+6. Set Up Half-Hour Lines
+   - Line Creation:
+     - At every 30-minute interval from 9:30 AM to 4:00 PM, draw vertical lines.
+     - Each line should include:
+       - Time Label: Display the time (e.g., 10:00 AM, 10:30 AM, etc.).
+       - Dollar Amount: Show the price level at the time of the line.
+     - Color: White
+
+7. Visualization
+   - Color Coding:
+     - Ensure all elements are color-coded appropriately:
+       - Previous Day High: Red
+       - Previous Day Low: Green
+       - Overnight High: Light Green
+       - Overnight Low: Light Red
+       - Opening Range High: Distinct Green Shade
+       - Opening Range Low: Distinct Red Shade
+       - Half-Hour Lines: White
+   - Maintain Clarity: Make sure the visual representation is clear and easy to interpret for quick decision-making.
+
+8. Performance Monitoring
+   - Set up alerts for breaking above or below the defined levels (previous day high/low, overnight high/low, and opening range).
+   - Consider including functionality for backtesting or recording trade performance based on the defined strategy.
+
+9. User Interface (Optional)
+   - Create a user-friendly interface for settings such as:
+     - Selecting color preferences.
+     - Adjusting time frames.
+     - Viewing performance metrics.
+
+10. Testing and Optimization
+   - Backtest the Strategy: Implement robust testing with historical data to ensure strategy robustness.
+   - Optimize Parameters: Based on testing results, optimize parameters for best performance.
+
+Conclusion
+This outline should provide a structured framework for creating your automated trading program in the Think or Swim platform, incorporating the necessary visual elements, calculations, and clarity for effective trading execution. Make sure to adapt any specific Think or Swim scripting functionalities as needed to align with the outlined steps.
