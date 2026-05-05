@@ -21,11 +21,58 @@
         <h2>Interactive demo (not ThinkorSwim)</h2>
         <p class="lead">
           Synthetic 1-minute RTH session (9:30–4:00 ET) with placeholder math for previous day,
-          overnight, and opening range levels. Use the panel to mirror planned study inputs.
+          overnight, and opening range levels. Set options below, then use <strong>Share / export</strong> to
+          send the exact same inputs to your client (link or JSON).
         </p>
         <div class="grid-two">
           <div class="panel">
-            <h3>Execution inputs (web demo)</h3>
+            <h3>Client profile (metadata only)</h3>
+            <div class="field">
+              <label for="clientLabel">Label</label>
+              <input type="text" id="clientLabel" placeholder="e.g. Acme — revision 2" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="clientNotes">Notes / requests</label>
+              <textarea
+                id="clientNotes"
+                placeholder="e.g. 15-minute opening range, hide overnight, alert copy for OR break…"
+              ></textarea>
+            </div>
+
+            <h3 style="margin-top: 1rem">Share &amp; export</h3>
+            <p class="hint">
+              <strong>Copy link</strong> encodes the current panel (colors, toggles, seed, notes) in the URL hash.
+              <strong>JSON</strong> is better for email attachments or version control.
+            </p>
+            <div class="btn-row">
+              <button type="button" class="primary" id="btnCopyLink">Copy share link</button>
+              <button type="button" id="btnDownloadJson">Download JSON</button>
+            </div>
+            <div id="copyToast" class="copy-toast" role="status" aria-live="polite"></div>
+            <div class="field" style="margin-top: 0.75rem">
+              <label for="importFile">Import JSON file</label>
+              <input type="file" id="importFile" accept=".json,application/json" />
+            </div>
+            <div class="field">
+              <label for="importPaste">Or paste JSON</label>
+              <textarea id="importPaste" placeholder='Paste {"v":1,...} then click Apply'></textarea>
+            </div>
+            <button type="button" id="btnApplyPaste">Apply pasted JSON</button>
+
+            <h3 style="margin-top: 1rem">Saved on this browser</h3>
+            <p class="hint">Stored in local storage on this device only.</p>
+            <div class="field field-row">
+              <label for="presetSelect">Preset</label>
+              <select id="presetSelect" style="max-width: 100%">
+                <option value="">— Load a saved preset —</option>
+              </select>
+            </div>
+            <div class="btn-row">
+              <button type="button" id="btnSavePreset">Save current as…</button>
+              <button type="button" id="btnDeletePreset">Delete selected</button>
+            </div>
+
+            <h3 style="margin-top: 1rem">Execution inputs (web demo)</h3>
             <div class="field field-row">
               <label for="seed">Scenario seed</label>
               <input type="number" id="seed" data-refresh value="42" />
@@ -178,9 +225,9 @@
       <section>
         <h2>GitHub Pages</h2>
         <p class="lead">
-          Push this folder as a repository, then enable Pages (branch <code>main</code>, folder
-          <code>/ (root)</code>). Share the <code>https://&lt;user&gt;.github.io/&lt;repo&gt;/</code> URL.
-          Optional query: <code>?or=45</code> sets opening range minutes on load.
+          Live site URL for the repo. Quick params: <code>?or=45&amp;seed=99</code> (opening range + seed).
+          Full client-specific setups: use <strong>Copy share link</strong> (adds a <code>#p=…</code> hash) or send a
+          downloaded JSON file.
         </p>
       </section>
     </main>

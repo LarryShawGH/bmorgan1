@@ -31,6 +31,35 @@ const defaults = {
   boxOpacity: 0.12,
 };
 
+const PRESET_VERSION = 1;
+const STORAGE_KEY = "tors_presets_v1";
+
+const PRESET_FIELDS = {
+  text: ["clientLabel", "clientNotes", "seed", "orMinutes"],
+  range: ["boxOpacity"],
+  color: [
+    "cPdHigh",
+    "cPdLow",
+    "cOnHigh",
+    "cOnLow",
+    "cOrHigh",
+    "cOrLow",
+    "cBoxFill",
+    "cCenter",
+    "cHalfHour",
+  ],
+  check: [
+    "sPdHigh",
+    "sPdLow",
+    "sOnHigh",
+    "sOnLow",
+    "sOrHigh",
+    "sOrLow",
+    "sBox",
+    "sHalfHour",
+  ],
+};
+
 function hexToRgba(hex, alpha) {
   const h = (hex || "").replace("#", "");
   if (h.length !== 6) return `rgba(99, 102, 241, ${alpha})`;
@@ -51,6 +80,118 @@ function applyQueryToForm() {
     const el = document.getElementById("seed");
     if (el && Number.isFinite(v)) el.value = String(v >>> 0);
   }
+}
+
+function presetToBase64Url(preset) {
+  const json = JSON.stringify(preset);
+  const b64 = btoa(unescape(encodeURIComponent(json)));
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/u, "");
+}
+
+function presetFromBase64Url(s) {
+  if (!s || typeof s !== "string") return null;
+  let b64 = s.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = b64.length % 4 ? "=".repeat(4 - (b64.length % 4)) : "";
+  b64 += pad;
+  const json = decodeURIComponent(escape(atob(b64)));
+  return JSON.parse(json);
+}
+
+function collectPreset() {
+  const p = { v: PRESET_VERSION };
+  for (const id of PRESET_FIELDS.text) {
+    const el = document.getElementById(id);
+    p[id] = el ? String(el.value) : "";
+  }
+  for (const id of PRESET_FIELDS.range) {
+    const el = document.getElementById(id);
+    p[id] = el ? String(el.value) : String(defaults.boxOpacity);
+  }
+  for (const id of PRESET_FIELDS.color) {
+    const el = document.getElementById(id);
+    p[id] = el ? el.value : defaults[id];
+  }
+  for (const id of PRESET_FIELDS.check) {
+    const el = document.getElementById(id);
+    p[id] = Boolean(el?.checked);
+  }
+  return p;
+}
+
+function applyPreset(raw) {
+  if (!raw || raw.v !== PRESET_VERSION) return false;
+  for (const id of PRESET_FIELDS.text) {
+    if (raw[id] === undefined) continue;
+    const el = document.getElementById(id);
+    if (el) el.value = String(raw[id]);
+  }
+  for (const id of PRESET_FIELDS.range) {
+    if (raw[id] === undefined) continue;
+    const el = document.getElementById(id);
+    if (el) el.value = String(raw[id]);
+  }
+  for (const id of PRESET_FIELDS.color) {
+    if (raw[id] === undefined) continue;
+    const el = document.getElementById(id);
+    if (el) el.value = String(raw[id]);
+  }
+  for (const id of PRESET_FIELDS.check) {
+    if (raw[id] === undefined) continue;
+    const el = document.getElementById(id);
+    if (el) el.checked = Boolean(raw[id]);
+  }
+  return true;
+}
+
+function applyHashPreset() {
+  const h = window.location.hash.replace(/^#/u, "");
+  if (!h.startsWith("p=")) return;
+  const encoded = h.slice(2);
+  try {
+    const data = presetFromBase64Url(encoded);
+    if (applyPreset(data)) draw();
+  } catch (e) {
+    console.warn("Invalid preset hash", e);
+  }
+}
+
+function listPresets() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePresetsList(arr) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+}
+
+function populatePresetSelect() {
+  const sel = document.getElementById("presetSelect");
+  if (!sel) return;
+  const current = sel.value;
+  const items = listPresets();
+  sel.innerHTML = '<option value="">— Load a saved preset —</option>';
+  for (const { name } of items) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  }
+  if (current && items.some((x) => x.name === current)) sel.value = current;
+}
+
+function showCopyToast(msg) {
+  const el = document.getElementById("copyToast");
+  if (!el) return;
+  el.textContent = msg;
+  clearTimeout(showCopyToast._t);
+  showCopyToast._t = setTimeout(() => {
+    el.textContent = "";
+  }, 2800);
 }
 
 function mulberry32(a) {
@@ -287,15 +428,125 @@ function wire() {
     draw();
   });
   document.getElementById("btnRedraw")?.addEventListener("click", draw);
+
+  document.getElementById("btnCopyLink")?.addEventListener("click", () => {
+    const preset = collectPreset();
+    const base = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+    const url = `${base}#p=${presetToBase64Url(preset)}`;
+    if (url.length > 8000) {
+      showCopyToast("Link too long for some browsers — use Download JSON instead.");
+      return;
+    }
+    navigator.clipboard.writeText(url).then(
+      () => showCopyToast("Share link copied to clipboard."),
+      () => {
+        window.prompt("Copy this link:", url);
+        showCopyToast("Copy from the dialog if clipboard was blocked.");
+      }
+    );
+  });
+
+  document.getElementById("btnDownloadJson")?.addEventListener("click", () => {
+    const preset = collectPreset();
+    const slug = (preset.clientLabel || "tors-preset")
+      .replace(/[^\w\-]+/gu, "_")
+      .replace(/_+/gu, "_")
+      .replace(/^_|_$/gu, "")
+      .slice(0, 48) || "tors-preset";
+    const blob = new Blob([JSON.stringify(preset, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${slug}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showCopyToast("JSON file downloaded.");
+  });
+
+  document.getElementById("importFile")?.addEventListener("change", (ev) => {
+    const file = ev.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result));
+        if (applyPreset(data)) {
+          draw();
+          showCopyToast("Imported preset from file.");
+        } else showCopyToast("Invalid preset file (wrong version).");
+      } catch (e) {
+        showCopyToast("Could not read JSON.");
+        console.warn(e);
+      }
+      ev.target.value = "";
+    };
+    reader.readAsText(file);
+  });
+
+  document.getElementById("btnApplyPaste")?.addEventListener("click", () => {
+    const ta = document.getElementById("importPaste");
+    if (!ta) return;
+    try {
+      const data = JSON.parse(ta.value.trim());
+      if (applyPreset(data)) {
+        draw();
+        showCopyToast("Applied pasted JSON.");
+      } else showCopyToast("Invalid JSON preset (need v:1).");
+    } catch (e) {
+      showCopyToast("Invalid JSON.");
+      console.warn(e);
+    }
+  });
+
+  document.getElementById("presetSelect")?.addEventListener("change", (ev) => {
+    const name = ev.target.value;
+    if (!name) return;
+    const item = listPresets().find((x) => x.name === name);
+    if (item?.preset && applyPreset(item.preset)) draw();
+  });
+
+  document.getElementById("btnSavePreset")?.addEventListener("click", () => {
+    const label = document.getElementById("clientLabel")?.value?.trim() || "";
+    const name = window.prompt("Name for this preset (saved in this browser only)", label);
+    if (!name || !String(name).trim()) return;
+    const key = String(name).trim();
+    const preset = collectPreset();
+    const next = listPresets().filter((x) => x.name !== key);
+    next.push({ name: key, preset });
+    savePresetsList(next);
+    populatePresetSelect();
+    const sel = document.getElementById("presetSelect");
+    if (sel) sel.value = key;
+    showCopyToast(`Saved "${key}" on this device.`);
+  });
+
+  document.getElementById("btnDeletePreset")?.addEventListener("click", () => {
+    const sel = document.getElementById("presetSelect");
+    const name = sel?.value;
+    if (!name) {
+      showCopyToast("Select a preset to delete.");
+      return;
+    }
+    if (!window.confirm(`Delete preset “${name}” from this browser?`)) return;
+    savePresetsList(listPresets().filter((x) => x.name !== name));
+    populatePresetSelect();
+    showCopyToast("Preset deleted.");
+  });
+
   let resizeT;
   window.addEventListener("resize", () => {
     clearTimeout(resizeT);
     resizeT = setTimeout(draw, 120);
   });
+
+  window.addEventListener("hashchange", () => {
+    applyHashPreset();
+  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   applyQueryToForm();
+  applyHashPreset();
+  populatePresetSelect();
   wire();
   draw();
 });

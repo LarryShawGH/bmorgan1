@@ -166,6 +166,53 @@ button.primary:hover {
   color: #fff;
 }
 
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.btn-row button {
+  flex: 1;
+  min-width: 120px;
+}
+
+textarea,
+select {
+  font-family: inherit;
+  font-size: 0.875rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+}
+
+textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+select {
+  cursor: pointer;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin: 0.35rem 0 0;
+  line-height: 1.4;
+}
+
+.copy-toast {
+  font-size: 0.75rem;
+  color: #3fb950;
+  margin-top: 0.35rem;
+  min-height: 1.2em;
+}
+
 .chart-wrap {
   position: relative;
   border: 1px solid var(--border);
