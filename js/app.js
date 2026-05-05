@@ -194,6 +194,72 @@ function showCopyToast(msg) {
   }, 2800);
 }
 
+/** In-memory workbook for re-parse when opening-range minutes change. */
+const excelCache = {
+  buffer: null,
+  fileName: "",
+  parsedOr: NaN,
+  parsed: null,
+};
+
+function setExcelStatus(text) {
+  const el = document.getElementById("excelStatus");
+  if (el) el.textContent = text || "";
+}
+
+function clearExcelData() {
+  excelCache.buffer = null;
+  excelCache.fileName = "";
+  excelCache.parsedOr = NaN;
+  excelCache.parsed = null;
+  setExcelStatus("");
+}
+
+function getExcelParsed() {
+  if (!excelCache.buffer || typeof TorSExcel === "undefined") return null;
+  const orM = Math.max(
+    5,
+    Math.min(120, parseInt(document.getElementById("orMinutes")?.value || "30", 10) || 30)
+  );
+  if (excelCache.parsed && excelCache.parsedOr === orM) return excelCache.parsed;
+  const res = TorSExcel.parseArrayBuffer(excelCache.buffer, orM);
+  excelCache.parsed = res;
+  excelCache.parsedOr = orM;
+  return res;
+}
+
+function getSeriesForDraw() {
+  const ex = getExcelParsed();
+  if (ex && ex.ok && ex.bars.length >= 2) {
+    return {
+      source: "excel",
+      bars: ex.bars,
+      levels: ex.levels,
+      fileName: excelCache.fileName,
+      sheetName: ex.sheetName,
+    };
+  }
+  const seed = parseInt(document.getElementById("seed")?.value || "42", 10) || 42;
+  const g = generateSession(seed);
+  return { source: "demo", bars: g.bars, levels: g.levels, fileName: "", sheetName: "" };
+}
+
+function barIndexForHalfHour(series, etMinute) {
+  if (series.source === "excel" && series.bars[0]?.etMins != null) {
+    const bars = series.bars;
+    for (let i = 0; i < bars.length; i++) {
+      if (bars[i].etMins >= etMinute) return i;
+    }
+    return Math.max(0, bars.length - 1);
+  }
+  const idx = Math.round(((etMinute - RTH_START) / BAR_MINUTES) * (series.bars.length / BARS_PER_DAY));
+  return Math.min(series.bars.length - 1, Math.max(0, idx));
+}
+
+function levelOk(v) {
+  return v != null && Number.isFinite(v);
+}
+
 function mulberry32(a) {
   return function () {
     let t = (a += 0x6d2b79f5);
@@ -290,8 +356,9 @@ function draw() {
   const plotW = W - pad.l - pad.r;
   const plotH = H - pad.t - pad.b;
 
-  const seed = parseInt(document.getElementById("seed")?.value || "42", 10) || 42;
-  const { bars, levels } = generateSession(seed);
+  const series = getSeriesForDraw();
+  const bars = series.bars;
+  const levels = series.levels;
   const cfg = getConfig();
 
   let ymin = Infinity;
@@ -301,8 +368,10 @@ function draw() {
     ymax = Math.max(ymax, b.h);
   }
   for (const v of Object.values(levels)) {
-    ymin = Math.min(ymin, v);
-    ymax = Math.max(ymax, v);
+    if (levelOk(v)) {
+      ymin = Math.min(ymin, v);
+      ymax = Math.max(ymax, v);
+    }
   }
   const padY = (ymax - ymin) * 0.08 || 0.1;
   ymin -= padY;
@@ -332,7 +401,11 @@ function draw() {
   ctx.fillStyle = "#8b949e";
   ctx.font = "12px " + getComputedStyle(document.body).fontFamily;
   ctx.textAlign = "center";
-  ctx.fillText("Eastern Time (concept demo)", W / 2, 18);
+  const subtitle =
+    series.source === "excel"
+      ? `Excel: ${series.fileName} (${bars.length} bars)`
+      : "Eastern Time (concept demo)";
+  ctx.fillText(subtitle, W / 2, 18);
 
   function hLine(price, color, dash) {
     const y = yScale(price);
@@ -346,7 +419,7 @@ function draw() {
     ctx.setLineDash([]);
   }
 
-  if (cfg.showBox) {
+  if (cfg.showBox && levelOk(levels.pdHigh) && levelOk(levels.pdLow)) {
     const y1 = yScale(levels.pdHigh);
     const y2 = yScale(levels.pdLow);
     const top = Math.min(y1, y2);
@@ -361,12 +434,12 @@ function draw() {
     ctx.fillText(mid.toFixed(2), pad.l + plotW - 48, yScale(mid) - 4);
   }
 
-  if (cfg.showPdH) hLine(levels.pdHigh, cfg.pdHigh);
-  if (cfg.showPdL) hLine(levels.pdLow, cfg.pdLow);
-  if (cfg.showOnH) hLine(levels.onHigh, cfg.onHigh, [6, 4]);
-  if (cfg.showOnL) hLine(levels.onLow, cfg.onLow, [6, 4]);
-  if (cfg.showOrH) hLine(levels.orHigh, cfg.orHigh);
-  if (cfg.showOrL) hLine(levels.orLow, cfg.orLow);
+  if (cfg.showPdH && levelOk(levels.pdHigh)) hLine(levels.pdHigh, cfg.pdHigh);
+  if (cfg.showPdL && levelOk(levels.pdLow)) hLine(levels.pdLow, cfg.pdLow);
+  if (cfg.showOnH && levelOk(levels.onHigh)) hLine(levels.onHigh, cfg.onHigh, [6, 4]);
+  if (cfg.showOnL && levelOk(levels.onLow)) hLine(levels.onLow, cfg.onLow, [6, 4]);
+  if (cfg.showOrH && levelOk(levels.orHigh)) hLine(levels.orHigh, cfg.orHigh);
+  if (cfg.showOrL && levelOk(levels.orLow)) hLine(levels.orLow, cfg.orLow);
 
   const halfHourStarts = [];
   for (let m = RTH_START; m <= RTH_END; m += 30) {
@@ -376,8 +449,7 @@ function draw() {
   if (cfg.showHalfHour) {
     ctx.font = "9px " + getComputedStyle(document.body).fontFamily;
     halfHourStarts.forEach((etMin, idx) => {
-      const barIdx = Math.round(((etMin - RTH_START) / BAR_MINUTES) * (bars.length / BARS_PER_DAY));
-      const i = Math.min(bars.length - 1, Math.max(0, barIdx));
+      const i = barIndexForHalfHour(series, etMin);
       const x = xScale(i);
       const close = bars[i].c;
       ctx.beginPath();
@@ -429,6 +501,70 @@ function wire() {
   });
   document.getElementById("btnRedraw")?.addEventListener("click", draw);
 
+  document.getElementById("btnLoadExcel")?.addEventListener("click", () => {
+    document.getElementById("excelFile")?.click();
+  });
+
+  document.getElementById("btnExcelTemplate")?.addEventListener("click", () => {
+    if (typeof TorSExcel === "undefined" || typeof XLSX === "undefined") {
+      showCopyToast("Excel library failed to load. Check network / CDN.");
+      return;
+    }
+    TorSExcel.downloadTemplate();
+    showCopyToast("Template downloaded (tors-excel-template.xlsx).");
+  });
+
+  document.getElementById("btnUseDemo")?.addEventListener("click", () => {
+    clearExcelData();
+    const inp = document.getElementById("excelFile");
+    if (inp) inp.value = "";
+    draw();
+    showCopyToast("Using synthetic demo data.");
+  });
+
+  document.getElementById("excelFile")?.addEventListener("change", (ev) => {
+    const file = ev.target.files?.[0];
+    if (!file) return;
+    if (typeof TorSExcel === "undefined" || typeof XLSX === "undefined") {
+      showCopyToast("Excel library not loaded.");
+      ev.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const buf = reader.result;
+      if (!(buf instanceof ArrayBuffer)) {
+        showCopyToast("Could not read file.");
+        ev.target.value = "";
+        return;
+      }
+      excelCache.buffer = buf;
+      excelCache.fileName = file.name;
+      excelCache.parsedOr = NaN;
+      excelCache.parsed = null;
+      const res = TorSExcel.parseArrayBuffer(buf, parseInt(document.getElementById("orMinutes")?.value || "30", 10) || 30);
+      excelCache.parsed = res;
+      excelCache.parsedOr = parseInt(document.getElementById("orMinutes")?.value || "30", 10) || 30;
+      if (!res.ok) {
+        clearExcelData();
+        const inp2 = document.getElementById("excelFile");
+        if (inp2) inp2.value = "";
+        showCopyToast(res.error || "Excel parse failed.");
+        setExcelStatus(res.error || "");
+        draw();
+        return;
+      }
+      const msg = [
+        `Loaded ${file.name} — sheet “${res.sheetName}”: ${res.rowCount} rows → ${res.bars.length} chart bars (latest ET day).`,
+        ...(res.warnings || []),
+      ].join(" ");
+      setExcelStatus(msg);
+      showCopyToast("Excel loaded.");
+      draw();
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
   document.getElementById("btnCopyLink")?.addEventListener("click", () => {
     const preset = collectPreset();
     const base = `${window.location.origin}${window.location.pathname}${window.location.search}`;
@@ -437,8 +573,11 @@ function wire() {
       showCopyToast("Link too long for some browsers — use Download JSON instead.");
       return;
     }
+    const excelHint = excelCache.buffer
+      ? " Send the .xlsx separately (not embedded in the link)."
+      : "";
     navigator.clipboard.writeText(url).then(
-      () => showCopyToast("Share link copied to clipboard."),
+      () => showCopyToast(`Share link copied.${excelHint}`),
       () => {
         window.prompt("Copy this link:", url);
         showCopyToast("Copy from the dialog if clipboard was blocked.");
@@ -526,7 +665,7 @@ function wire() {
       showCopyToast("Select a preset to delete.");
       return;
     }
-    if (!window.confirm(`Delete preset “${name}” from this browser?`)) return;
+    if (!window.confirm(`Delete preset "${name}" from this browser?`)) return;
     savePresetsList(listPresets().filter((x) => x.name !== name));
     populatePresetSelect();
     showCopyToast("Preset deleted.");
