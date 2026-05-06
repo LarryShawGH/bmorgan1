@@ -26,7 +26,26 @@
         </p>
         <div class="grid-two">
           <div class="panel">
-            <h3>Client profile (metadata only)</h3>
+            <h3>Excel data (optional)</h3>
+            <p class="hint">
+              First worksheet: row 1 headers. Required:
+              <strong>Time</strong> (datetime or Excel date) and <strong>High</strong> / <strong>Low</strong>; use
+              <strong>Open</strong> / <strong>Close</strong> when available. Optional level columns:
+              <code>PD_High</code>, <code>PD_Low</code>, <code>ON_High</code>, <code>ON_Low</code>,
+              <code>OR_High</code>, <code>OR_Low</code> (any row; first numeric wins). Multi-day rows use ET for
+              prior-day / overnight math; latest day drives the candle preview.
+            </p>
+            <input type="file" id="excelFile" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden />
+            <div class="btn-row">
+              <button type="button" class="primary" id="btnLoadExcel">Load Excel…</button>
+              <button type="button" id="btnExcelTemplate">Download template</button>
+            </div>
+            <button type="button" id="btnUseDemo" style="margin-top: 0.5rem; width: 100%">
+              Use demo data (clear Excel)
+            </button>
+            <p id="excelStatus" class="hint" style="margin-top: 0.65rem"></p>
+
+            <h3 style="margin-top: 1rem">Client profile (metadata only)</h3>
             <div class="field">
               <label for="clientLabel">Label</label>
               <input type="text" id="clientLabel" placeholder="e.g. Acme — revision 2" autocomplete="off" />
@@ -97,25 +116,6 @@
             <button type="button" id="btnRedraw" style="margin-top: 0.5rem; width: 100%">
               Redraw
             </button>
-
-            <h3 style="margin-top: 1rem">Excel data (optional)</h3>
-            <p class="hint">
-              First worksheet: row 1 headers. Required:
-              <strong>Time</strong> (datetime or Excel date) and <strong>High</strong> / <strong>Low</strong>; use
-              <strong>Open</strong> / <strong>Close</strong> when available. Optional level columns:
-              <code>PD_High</code>, <code>PD_Low</code>, <code>ON_High</code>, <code>ON_Low</code>,
-              <code>OR_High</code>, <code>OR_Low</code> (any row; first numeric wins). Multi-day rows use ET for
-              prior-day / overnight math; latest day drives the candle preview.
-            </p>
-            <input type="file" id="excelFile" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden />
-            <div class="btn-row">
-              <button type="button" class="primary" id="btnLoadExcel">Load Excel…</button>
-              <button type="button" id="btnExcelTemplate">Download template</button>
-            </div>
-            <button type="button" id="btnUseDemo" style="margin-top: 0.5rem; width: 100%">
-              Use demo data (clear Excel)
-            </button>
-            <p id="excelStatus" class="hint" style="margin-top: 0.65rem"></p>
 
             <h3 style="margin-top: 1rem">Visibility</h3>
             <div class="field">
