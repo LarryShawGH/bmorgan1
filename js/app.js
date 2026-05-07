@@ -207,6 +207,11 @@ function setExcelStatus(text) {
   if (el) el.textContent = text || "";
 }
 
+function setDataSource(text) {
+  const el = document.getElementById("dataSource");
+  if (el) el.textContent = text || "";
+}
+
 function clearExcelData() {
   excelCache.buffer = null;
   excelCache.fileName = "";
@@ -375,6 +380,14 @@ function draw() {
   const bars = series.bars;
   const levels = series.levels;
   const cfg = getConfig();
+  const engine = typeof XLSX === "undefined" ? "Excel engine: MISSING" : "Excel engine: OK";
+  const sourceLabel =
+    series.source === "excel"
+      ? `Data source: EXCEL (${series.fileName}) — ${engine}`
+      : series.source === "excel_error"
+        ? `Data source: EXCEL ERROR — ${engine}`
+        : `Data source: DEMO — ${engine}`;
+  setDataSource(sourceLabel);
 
   let ymin = Infinity;
   let ymax = -Infinity;
@@ -521,6 +534,7 @@ function wire() {
   document.getElementById("btnRedraw")?.addEventListener("click", draw);
 
   document.getElementById("btnLoadExcel")?.addEventListener("click", () => {
+    setExcelStatus("Choose an Excel file to load…");
     document.getElementById("excelFile")?.click();
   });
 
@@ -715,5 +729,6 @@ document.addEventListener("DOMContentLoaded", () => {
   applyHashPreset();
   populatePresetSelect();
   wire();
+  setDataSource(typeof XLSX === "undefined" ? "Data source: DEMO — Excel engine: MISSING" : "Data source: DEMO — Excel engine: OK");
   draw();
 });
