@@ -552,15 +552,19 @@ function wire() {
         showCopyToast(res.error || "Excel parse failed.");
         setExcelStatus(res.error || "");
         draw();
+        ev.target.value = "";
         return;
       }
+      const modified = new Date(file.lastModified);
       const msg = [
-        `Loaded ${file.name} — sheet “${res.sheetName}”: ${res.rowCount} rows → ${res.bars.length} chart bars (latest ET day).`,
+        `Loaded ${file.name} (${Math.round(file.size / 1024)} KB, modified ${modified.toLocaleString()}) — sheet “${res.sheetName}”: ${res.rowCount} rows → ${res.bars.length} chart bars (latest ET day).`,
         ...(res.warnings || []),
       ].join(" ");
       setExcelStatus(msg);
       showCopyToast("Excel loaded.");
       draw();
+      // Important: reset file input so re-selecting same filename triggers change event.
+      ev.target.value = "";
     };
     reader.readAsArrayBuffer(file);
   });
