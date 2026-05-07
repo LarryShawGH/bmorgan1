@@ -403,7 +403,7 @@ function draw() {
   ctx.textAlign = "center";
   const subtitle =
     series.source === "excel"
-      ? `Excel: ${series.fileName} (${bars.length} bars)`
+      ? `EXCEL MODE — ${series.fileName} (${bars.length} bars)`
       : "Eastern Time (concept demo)";
   ctx.fillText(subtitle, W / 2, 18);
 
@@ -468,7 +468,9 @@ function draw() {
     });
   }
 
-  const candleW = Math.max(1, plotW / bars.length * 0.6);
+  const candleW = Math.max(1, (plotW / bars.length) * 0.6);
+  const upColor = series.source === "excel" ? "#38bdf8" : "#3fb950";
+  const downColor = series.source === "excel" ? "#fb7185" : "#f85149";
   bars.forEach((b, i) => {
     const x = xScale(i);
     const yO = yScale(b.o);
@@ -476,8 +478,8 @@ function draw() {
     const yH = yScale(b.h);
     const yL = yScale(b.l);
     const up = b.c >= b.o;
-    ctx.strokeStyle = up ? "#3fb950" : "#f85149";
-    ctx.fillStyle = up ? "#3fb950" : "#f85149";
+    ctx.strokeStyle = up ? upColor : downColor;
+    ctx.fillStyle = up ? upColor : downColor;
     ctx.beginPath();
     ctx.moveTo(x, yH);
     ctx.lineTo(x, yL);
