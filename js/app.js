@@ -243,6 +243,17 @@ function getSeriesForDraw() {
       sheetName: ex.sheetName,
     };
   }
+  // If an Excel file was chosen but parsing isn't usable, surface that state
+  // instead of silently blending into the demo.
+  if (excelCache.buffer) {
+    const msg =
+      ex && !ex.ok
+        ? `Excel loaded but could not be used: ${ex.error || "parse failed"}.`
+        : "Excel file selected but no usable bars were parsed. Check headers (Time/Open/High/Low/Close).";
+    setExcelStatus(msg);
+    const fallback = generateSession(42);
+    return { source: "excel_error", bars: fallback.bars, levels: fallback.levels, fileName: excelCache.fileName, sheetName: "" };
+  }
   const seed = parseInt(document.getElementById("seed")?.value || "42", 10) || 42;
   const g = generateSession(seed);
   return { source: "demo", bars: g.bars, levels: g.levels, fileName: "", sheetName: "" };
@@ -408,6 +419,8 @@ function draw() {
   const subtitle =
     series.source === "excel"
       ? `EXCEL MODE — ${series.fileName} (${bars.length} bars)`
+      : series.source === "excel_error"
+        ? `EXCEL ERROR — see status under Excel buttons`
       : "Eastern Time (concept demo)";
   ctx.fillText(subtitle, W / 2, 18);
 
@@ -533,14 +546,17 @@ function wire() {
     if (!file) return;
     if (typeof TorSExcel === "undefined" || typeof XLSX === "undefined") {
       showCopyToast("Excel library not loaded.");
+      setExcelStatus("Excel library not loaded (XLSX missing). Hard refresh the page (Ctrl+F5).");
       ev.target.value = "";
       return;
     }
+    setExcelStatus(`Reading ${file.name}…`);
     const reader = new FileReader();
     reader.onload = () => {
       const buf = reader.result;
       if (!(buf instanceof ArrayBuffer)) {
         showCopyToast("Could not read file.");
+        setExcelStatus("Could not read file into memory.");
         ev.target.value = "";
         return;
       }
@@ -552,11 +568,8 @@ function wire() {
       excelCache.parsed = res;
       excelCache.parsedOr = parseInt(document.getElementById("orMinutes")?.value || "30", 10) || 30;
       if (!res.ok) {
-        clearExcelData();
-        const inp2 = document.getElementById("excelFile");
-        if (inp2) inp2.value = "";
         showCopyToast(res.error || "Excel parse failed.");
-        setExcelStatus(res.error || "");
+        setExcelStatus(`Parse failed: ${res.error || "unknown error"}`);
         draw();
         ev.target.value = "";
         return;
@@ -570,6 +583,11 @@ function wire() {
       showCopyToast("Excel loaded.");
       draw();
       // Important: reset file input so re-selecting same filename triggers change event.
+      ev.target.value = "";
+    };
+    reader.onerror = () => {
+      showCopyToast("Could not read file.");
+      setExcelStatus("FileReader error while reading workbook.");
       ev.target.value = "";
     };
     reader.readAsArrayBuffer(file);
