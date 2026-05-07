@@ -217,6 +217,10 @@ function clearExcelData() {
 
 function getExcelParsed() {
   if (!excelCache.buffer || typeof TorSExcel === "undefined") return null;
+  if (typeof XLSX === "undefined") {
+    setExcelStatus("Excel library not loaded (XLSX missing). If you’re on GitHub Pages, hard refresh (Ctrl+F5).");
+    return null;
+  }
   const orM = Math.max(
     5,
     Math.min(120, parseInt(document.getElementById("orMinutes")?.value || "30", 10) || 30)

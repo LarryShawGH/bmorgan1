@@ -273,5 +273,10 @@
     XLSX.writeFile(wb, "tors-excel-template.xlsx");
   }
 
-  global.TorSExcel = { parseArrayBuffer: parseArrayBuffer, downloadTemplate: downloadTemplate };
+  const api = { parseArrayBuffer: parseArrayBuffer, downloadTemplate: downloadTemplate };
+  global.TorSExcel = api;
+  // Node/unit-test support
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+  }
 })(typeof window !== "undefined" ? window : globalThis);
